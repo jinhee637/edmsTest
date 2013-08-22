@@ -1,0 +1,7 @@
+﻿@charset "utf-8";
+h1,p{margin:0; padding:0;}
+#error{position:absolute; top:50%; left:50%; margin-top:-200px; margin-left:-300px; color:#848484; }
+.errorContent{border:1px solid #dbdbdb; background-color:#f7f7f7; padding: 26px}
+.errorText{margin:16px 0 0 86px; border-top:1px solid #696fe4; padding-top:18px; line-height:18px}
+.errorText span{font-weight:bold}
+.homeBtn{float:right}
