@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE sqlMap PUBLIC "-//iBATIS.com//DTD SQL Map 2.0//EN" "http://www.ibatis.com/dtd/sql-map-2.dtd">
+
+<sqlMap namespace="Doc">
+	<typeAlias  alias="egovMap" type="egovframework.rte.psl.dataaccess.util.EgovMap"/>
+	<typeAlias alias="DocVO" type="kr.co.kibi.edms.admin.service.DocVO"/>
+	
+	<resultMap id="docDetail" class="kr.co.kibi.edms.admin.service.DocVO">
+		<result property="docSeq" column="docSeq" nullValue=""></result>
+		<result property="userNm" column="userNm" nullValue=""></result>
+		<result property="fregDt" column="fregDt" nullValue=""></result>
+		<result property="metafregDt" column="metafregDt" nullValue=""></result>
+		<result property="sbjNt" column="sbjNt" nullValue=""></result>
+		<result property="downCnt" column="downCnt" nullValue=""></result>
+		<result property="viewCnt" column="viewCnt" nullValue=""></result>
+		<result property="catNm" column="catNm" nullValue=""></result>
+		<result property="catSeq" column="catSeq" nullValue=""></result>
+		<result property="titIf" column="titIf" nullValue=""></result>
+		<result property="writmanNm" column="writmanNm" nullValue=""></result>
+		<result property="keywordIf" column="keywordIf" nullValue=""></result>
+		<result property="articleId" column="articleId" nullValue=""></result>
+	</resultMap>
+	
+	<resultMap id="suggestList" class="kr.co.kibi.edms.admin.service.DocVO">
+		<result property="regptNm" column="REGPT_NM"></result>
+		<result property="sgtDc" column="SGT_DC"></result>
+		<result property="regTm" column="REG_TM"></result>
+	</resultMap>
+	
+	<select id="DocDAO.selectDocList" parameterClass="DocVO" resultClass="DocVO">
+		SELECT *
+		FROM(SELECT
+			allCount AS "pagingVO.allCount",
+			DOC_SEQ AS docSeq,
+			TIT_IF AS titIf,
+			WRITMAN_NM AS writmanNm,
+			GROUP_NM AS deptNm,
+			REPLACE(FREG_DT, '/', '.') AS fregDt,
+			CAT_NM AS catNm,
+			VIEW_CNT AS viewCnt,
+			DOWN_CNT AS downCnt,
+			ROWNUM rn
+		FROM
+			(SELECT
+				COUNT(A.DOC_SEQ) OVER() AS allCount,
+				A.DOC_SEQ,
+				B.TIT_IF,
+				B.WRITMAN_NM,
+				C.GROUP_NM,
+				A.FREG_DT,
+				D.CAT_NM,
+				A.VIEW_CNT,
+				A.DOWN_CNT
+			FROM ED_DATA A 
+				LEFT JOIN ED_PDFMETA B
+					ON A.DOC_SEQ = B.DOC_SEQ
+				LEFT JOIN ED_GROUP C
+					ON A.GROUP_SEQ = C.GROUP_SEQ
+				LEFT JOIN ED_CATEGORY D
+					ON A.CAT_SEQ = D.CAT_SEQ
+			WHERE 1=1
+				<isEqual prepend="AND" property="allSearch" compareValue="Y">
+					(B.TIT_IF LIKE REPLACE('%' || #all# || '%',' ','') 
+					OR B.WRITMAN_NM LIKE REPLACE('%' || #all# || '%',' ','')
+					OR B.SBJ_NT LIKE REPLACE('%' || #all# || '%',' ','')
+					OR B.KEYWORD_IF LIKE REPLACE('%' || #all# || '%',' ',''))
+				</isEqual>
+				<isEqual prepend="AND" property="titSearch" compareValue="Y">
+					B.TIT_IF LIKE REPLACE('%' || #titIf# || '%',' ','')
+				</isEqual>
+				<isEqual prepend="AND" property="writmanSearch" compareValue="Y">
+					B.WRITMAN_NM LIKE REPLACE('%' || #writmanNm# || '%',' ','')
+				</isEqual>
+				<isEqual prepend="AND" property="sbjSearch" compareValue="Y">
+					B.SBJ_NT LIKE REPLACE('%' || #sbjNt# || '%',' ','')
+				</isEqual>
+				<isEqual prepend="AND" property="keywordSearch" compareValue="Y">
+					B.KEYWORD_IF LIKE REPLACE('%' || #keywordIf# || '%',' ','')
+				</isEqual>
+				<isEqual prepend="ORDER BY" property="orderViewCnt" compareValue="on">
+					A.VIEW_CNT DESC
+				</isEqual>
+				<isEqual prepend="ORDER BY" property="orderDownCnt" compareValue="on">
+					A.DOWN_CNT DESC
+				</isEqual>
+				<isEqual prepend="ORDER BY" property="orderDt" compareValue="on">
+					A.FREG_DT DESC
+				</isEqual>
+			)
+			)
+			WHERE rn > (#pagingVO.currentPage#-1) * #pagingVO.articlePerPage# 
+	 	      AND rn <![CDATA[<=]]> #pagingVO.currentPage# * #pagingVO.articlePerPage#
+	</select>
+	
+	<select id="DocDAO.selectDocView" parameterClass="DocVO" resultMap="docDetail">
+			SELECT 
+				A.DOC_SEQ AS docSeq,
+				F.USER_NM AS userNm,
+				REPLACE(A.FREG_DT, '/', '.') AS fregDt,
+				A.DOWN_CNT AS downCnt,
+				A.VIEW_CNT AS viewCnt,
+				C.CAT_NM AS catNm,
+				C.CAT_SEQ AS catSeq,
+				A.ARTICLE_ID AS articleId,
+				B.TIT_IF AS titIf,
+				B.WRITMAN_NM AS writmanNm,
+				REPLACE(B.FREG_DT, '-', '.') AS metafregDt,
+				B.SBJ_NT AS sbjNt,
+				B.KEYWORD_IF AS keywordIf
+			FROM ED_DATA A
+				LEFT JOIN ED_PDFMETA B
+					ON A.DOC_SEQ = B.DOC_SEQ
+				LEFT JOIN ED_CATEGORY C
+					ON A.CAT_SEQ = C.CAT_SEQ
+				LEFT JOIN ED_USER F
+					ON A.PARTY_SEQ = F.PARTY_SEQ
+			WHERE A.DOC_SEQ = #docSeq#
+	</select>
+	
+	<select id="DocDAO.selectSuggestList" parameterClass="DocVO" resultMap="suggestList">
+		SELECT B.REGPT_NM, 
+			B.SGT_DC,
+			REPLACE(B.REG_TM,'/','.') AS REG_TM
+		FROM ED_DATA A
+			LEFT JOIN ED_SUGGEST B
+				ON A.DOC_SEQ = B.DOC_SEQ
+		WHERE A.DOC_SEQ = #docSeq#
+		ORDER BY B.REG_TM DESC
+	</select>
+	
+	<delete id="DocDAO.deleteDoc" parameterClass="DocVO">
+		<![CDATA[ 
+			DELETE
+			FROM ED_DATA
+			WHERE DOC_SEQ = #docSeq#
+		]]>
+	</delete>
+	
+	<delete id="DocDAO.deletePdfMeta" parameterClass="DocVO">
+		<![CDATA[ 
+			DELETE
+			FROM ED_PDFMETA
+			WHERE DOC_SEQ = #docSeq#
+		]]>
+	</delete>
+	
+	<delete id="DocDAO.deleteSgt" parameterClass="DocVO">
+		<![CDATA[ 
+			DELETE
+			FROM ED_SUGGEST
+			WHERE DOC_SEQ = #docSeq#
+		]]>
+	</delete>
+		
+	<update id="DocDAO.updateDoc" parameterClass="DocVO">
+		<![CDATA[ 
+			UPDATE 	ED_DATA
+			SET CAT_SEQ = #catSeq#
+			WHERE DOC_SEQ = #docSeq#
+		]]>
+	</update>
+	
+	<update id="DocDAO.updatePdfMeta" parameterClass="DocVO">
+		<![CDATA[
+			UPDATE ED_PDFMETA
+				SET TIT_IF = #uptTitIf#,
+					WRITMAN_NM = #uptWritmanNm#,
+					FREG_DT = #metafregDt#,
+					SBJ_NT = #uptSbjNt#,
+					KEYWORD_IF = #uptKeywordIf#
+			WHERE DOC_SEQ = #docSeq#
+		]]>
+	</update>
+	
+</sqlMap>

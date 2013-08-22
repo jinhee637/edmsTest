@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE sqlMap PUBLIC "-//ibatis.apache.org//DTD SQL Map 2.0//EN" "http://ibatis.apache.org/dtd/sql-map-2.dtd">
+
+<sqlMap namespace="category">
+	<typeAlias  alias="categoryVO" type="kr.co.kibi.edms.com.service.CategoryVO"/>
+	<select id="adminCategoryDao.selectCate" resultClass="categoryVO">
+		<![CDATA[
+			SELECT NVL(D.CAT_SEQ,0) cat_seq
+				,D.CAT_NM cat_nm
+				,NVL(D.PARCAT_SEQ,0) parcat_seq
+				,D.CAT_DC cat_dc
+				,(SELECT COUNT(*) FROM ED_CATEGORY WHERE PARCAT_SEQ=D.CAT_SEQ) cnt
+				,level depth
+			FROM ED_CATEGORY D
+ 			START WITH D.CAT_SEQ = 0
+			CONNECT BY PRIOR  D.CAT_SEQ = D.PARCAT_SEQ
+			]]>
+	</select>
+    <update id="adminCategoryDao.updateCategory" parameterClass="categoryVO">
+        <![CDATA[
+            UPDATE ED_CATEGORY 
+            SET CAT_NM = #cat_nm#
+            WHERE CAT_SEQ = #cat_seq#
+        ]]>
+    </update>
+    <insert id="adminCategoryDao.insertCategory" parameterClass="categoryVO" >
+    	<selectKey keyProperty="cat_seq" resultClass="int" type="pre">
+			SELECT SQ_CATE.nextval FROM DUAL
+		</selectKey>
+		<![CDATA[
+			INSERT INTO ED_CATEGORY 
+			(
+				CAT_SEQ
+				,CAT_NM
+				,PARCAT_SEQ
+				,CAT_DC
+			)
+			VALUES 
+			(
+				#cat_seq#
+				,#cat_nm#
+				,#parcat_seq#
+				,''
+			 )
+				
+		
+		]]>
+	</insert>
+	<update id="adminCategoryDao.moveCategory" parameterClass="categoryVO">
+        <![CDATA[
+            UPDATE ED_CATEGORY 
+            SET PARCAT_SEQ = #parcat_seq#
+            WHERE CAT_SEQ = #cat_seq#
+        ]]>
+    </update>
+    <delete id="adminCategoryDao.deleteCategory" parameterClass="categoryVO">
+        <![CDATA[
+            DELETE 
+			FROM ED_CATEGORY
+			WHERE CAT_SEQ IN 
+	  		  	 	(
+	  		  	 	SELECT CAT_SEQ
+					FROM ED_CATEGORY
+ 					START WITH CAT_SEQ = #cat_seq#
+					CONNECT BY PRIOR  CAT_SEQ = PARCAT_SEQ
+					)
+			AND EXISTS (SELECT 'Y'
+					   FROM ED_USER A, ED_BIZROLE B
+					   WHERE A.PARTY_SEQ=B.PARTY_SEQ
+					   AND BIZROLE_CD='ADMIN'
+					   AND PW_IF=#pwd#)
+        ]]>
+    </delete>
+    <delete id="adminCategoryDao.deleteAuthority" parameterClass="categoryVO">
+        <![CDATA[
+            DELETE 
+			FROM ED_AUTHORITY
+			WHERE CAT_SEQ  = #cat_seq#
+        ]]>
+    </delete>
+    <select id="adminCategoryDao.checkDelCategory" parameterClass="categoryVO" resultClass="categoryVO">
+			SELECT COUNT(*) cnt
+			FROM ED_DATA
+			WHERE CAT_SEQ IN (SELECT CAT_SEQ
+								FROM ED_CATEGORY
+			 					START WITH CAT_SEQ = #cat_seq#
+								CONNECT BY PRIOR  CAT_SEQ = PARCAT_SEQ)
+    </select>
+	<update id="adminCategoryDao.updateCateDesc" parameterClass="categoryVO">
+        <![CDATA[
+            UPDATE ED_CATEGORY 
+            SET CAT_DC = #cat_dc#
+            WHERE CAT_SEQ = #cat_seq#
+        ]]>
+    </update>
+    <select id="adminCategoryDao.selectCategoryList" resultClass="categoryVO">
+    	SELECT CAT_SEQ,
+    		CAT_NM
+    	FROM ED_CATEGORY	
+    </select>
+	<select id="adminCategoryDao.selectGroup" parameterClass="groupVO" resultClass="groupVO">
+		<![CDATA[
+		    SELECT 
+		    	GROUP_SEQ
+		    	,GROUP_NM
+		    	,NVL(PARGROUP_SEQ,0)
+		    	,GROUP_DC 
+		    FROM ED_GROUP
+			ORDER BY GROUP_NM
+		]]>
+    </select>
+    <select id="adminCategoryDao.selectGroupCate" parameterClass="groupVO" resultClass="groupVO">
+    	<![CDATA[
+			SELECT 
+		    	B.GROUP_SEQ
+		    	,GROUP_NM
+		    	,NVL(PARGROUP_SEQ,0)
+		    	,GROUP_DC 
+		    FROM
+			ED_GROUP G, (
+						SELECT GROUP_SEQ
+							FROM ED_AUTHORITY
+							WHERE CAT_SEQ=(
+											SELECT CAT_SEQ FROM 
+											(
+												SELECT  A.CAT_SEQ
+												FROM    
+												(
+        											SELECT  
+        												CAT_SEQ
+        												,LEVEL LEV
+        											FROM    ED_CATEGORY      
+        											WHERE CAT_SEQ <>   #group_seq#
+        											START WITH CAT_SEQ = #group_seq#
+        											CONNECT BY PRIOR   PARCAT_SEQ = CAT_SEQ) A, EDMS.ED_AUTHORITY B
+													WHERE   A.CAT_SEQ = B.CAT_SEQ
+													AND     B.GROUP_SEQ > 0
+													GROUP BY A.CAT_SEQ, A.LEV
+													ORDER BY LEV
+												) AA
+												WHERE ROWNUM <2)
+							GROUP BY GROUP_SEQ
+							) B
+			WHERE G.GROUP_SEQ=B.GROUP_SEQ
+			AND G.GROUP_SEQ <> 1
+			ORDER BY GROUP_NM
+		]]>
+    </select>
+        <select id="adminCategoryDao.selectGroupAll" parameterClass="groupVO" resultClass="groupVO">
+    		<![CDATA[
+			    SELECT 
+			    	GROUP_SEQ
+			    	,GROUP_NM
+			    	,NVL(PARGROUP_SEQ,0)
+			    	,GROUP_DC 
+			    FROM ED_GROUP
+			    WHERE GROUP_SEQ <> 1
+				ORDER BY GROUP_NM
+			]]>
+    </select>
+    <select id="adminCategoryDao.checkParGroup" parameterClass="categoryVO" resultClass="int">
+			<![CDATA[
+			SELECT NVL(MAX(GROUP_SEQ),0)
+			FROM ED_AUTHORITY        
+			WHERE CAT_SEQ in 
+							(
+								SELECT CAT_SEQ
+								FROM ED_CATEGORY
+								WHERE CAT_SEQ<>#cat_seq#
+ 								START WITH CAT_SEQ = #cat_seq#
+								CONNECT BY  CAT_SEQ = prior PARCAT_SEQ)
+			]]>								
+    </select>
+    <insert id="adminCategoryDao.insertTempAuth" parameterClass="categoryVO">
+		<selectKey keyProperty="aut_seq" resultClass="int" type="pre">
+			SELECT SQ_AUTHORITY.nextval FROM DUAL
+		</selectKey>
+		<![CDATA[
+			INSERT INTO ED_AUTHORITY
+			(
+				AUT_SEQ
+				,CAT_SEQ
+				,DOC_SEQ
+				,GROUP_SEQ
+				,PARTY_SEQ
+				,USESRT_DT
+				,USEEND_DT
+				,READAUT_YN
+				,WRITEAUT_YN
+				,DOWNAUT_YN
+				,AUTSORT_SOR
+			)
+			VALUES 
+			(
+				#aut_seq#
+				,#cat_seq#
+				,0
+				,0
+				,0
+				,TO_CHAR(SYSDATE,'yyyymmddhh24miss')
+				,TO_CHAR(SYSDATE,'yyyymmddhh24miss')
+				,'N'
+				,'N'
+				,'N'
+				,#autsort_sor#
+			 )
+		]]>
+	</insert>
+	<select id="adminCategoryDao.selectDesc" parameterClass="categoryVO" resultClass="categoryVO">
+			<![CDATA[
+			SELECT  
+				A.CAT_SEQ cat_seq
+				,MAX(A.CAT_NM) cat_nm
+				,NVL(MAX(A.PARCAT_SEQ),0) parcat_seq
+				,MAX(A.CAT_DC) CAT_DC
+				,NVL(MAX(DECODE(AUTSORT_SOR,1,GROUP_SEQ)),0) group1
+				,NVL(MAX(DECODE(AUTSORT_SOR,2,GROUP_SEQ)),0) group2
+				,NVL(MAX(DECODE(AUTSORT_SOR,3,GROUP_SEQ)),0) group3
+			FROM    EDMS.ED_CATEGORY A, ED_AUTHORITY B
+			WHERE   A.CAT_SEQ=B.CAT_SEQ(+)
+			AND     A.CAT_SEQ = #cat_seq#
+			GROUP BY A.CAT_SEQ
+			]]>
+	</select>
+	<update id="adminCategoryDao.updateAuthority" parameterClass="categoryVO">
+		<![CDATA[
+			UPDATE ED_AUTHORITY
+			SET GROUP_SEQ=#group_seq#
+			WHERE CAT_SEQ=#cat_seq#
+			AND AUTSORT_SOR=#autsort_sor#
+		]]>
+	</update>
+	<update id="adminCategoryDao.updateAuthorityChild" parameterClass="categoryVO">
+		<![CDATA[
+			UPDATE ED_AUTHORITY
+			SET GROUP_SEQ=0
+			WHERE CAT_SEQ IN (SELECT CAT_SEQ
+								FROM ED_CATEGORY
+								WHERE CAT_SEQ <> #cat_seq#
+ 								START WITH CAT_SEQ = #cat_seq#
+								CONNECT BY PRIOR  CAT_SEQ = PARCAT_SEQ)
+			AND GROUP_SEQ NOT IN (SELECT GROUP_SEQ
+								 FROM ED_AUTHORITY
+								 WHERE CAT_SEQ=#cat_seq#
+								 GROUP BY CAT_SEQ,AUTSORT_SOR,GROUP_SEQ)
+		]]>	
+	</update>
+</sqlMap>
+
